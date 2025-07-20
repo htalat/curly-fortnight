@@ -8,10 +8,12 @@
 # macOS
 .DS_Store
 
-# Documentation files
+# Documentation files  
 CLAUDE.md
 *.mdc
-*.md
+
+# Exclude README from ignore
+!README.md
 
 # Other directories/files
 -alh/
