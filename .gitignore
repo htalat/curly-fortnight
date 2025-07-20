@@ -1,0 +1,18 @@
+# Swift build artifacts
+**/.build/
+**/Package.resolved
+**/.swiftpm/
+**/xcuserdata/
+**/*.xcworkspace
+
+# macOS
+.DS_Store
+
+# Documentation files
+CLAUDE.md
+*.mdc
+*.md
+
+# Other directories/files
+-alh/
+ls/
