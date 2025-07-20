@@ -18,7 +18,6 @@ class AXWindowManager {
     
     static func getWindowsUsingAXAPI() -> [AXWindowInfo] {
         guard checkAccessibilityPermissions() else {
-            print("Accessibility permissions not granted")
             requestAccessibilityPermissions()
             return []
         }
@@ -26,9 +25,7 @@ class AXWindowManager {
         var windows: [AXWindowInfo] = []
         let runningApps = NSWorkspace.shared.runningApplications
         
-        print("Checking \(runningApps.count) running applications...")
-        
-        // First, let's try to get windows using multiple approaches
+        // Get windows using multiple approaches
         for app in runningApps {
             guard app.activationPolicy == .regular,
                   let appName = app.localizedName,
@@ -37,20 +34,15 @@ class AXWindowManager {
                 continue
             }
             
-            print("Checking app: \(appName) (PID: \(app.processIdentifier))")
-            
             let axApp = AXUIElementCreateApplication(app.processIdentifier)
             var foundWindows: [AXUIElement] = []
             
             // Method 1: Try standard windows attribute
             var windowsRef: CFTypeRef?
-            var result = AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef)
+            let result = AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef)
             
             if result == .success, let windowArray = windowsRef as? [AXUIElement] {
                 foundWindows.append(contentsOf: windowArray)
-                print("  Regular windows: \(windowArray.count)")
-            } else {
-                print("  Regular windows failed: \(result)")
             }
             
             // Method 2: Try getting all children and filter for windows
@@ -69,7 +61,6 @@ class AXWindowManager {
                         }
                         if !isAlreadyFound {
                             foundWindows.append(child)
-                            print("  Found additional window via children")
                         }
                     }
                 }
@@ -86,23 +77,18 @@ class AXWindowManager {
                     }
                     if !isAlreadyFound {
                         foundWindows.append(minimizedWindow)
-                        print("  Found minimized window")
                     }
                 }
             }
-            
-            print("  Total windows found: \(foundWindows.count)")
             
             if !foundWindows.isEmpty {
                 for window in foundWindows {
                     let windowInfo = getWindowInfo(from: window, appName: appName, pid: app.processIdentifier)
                     if let info = windowInfo {
                         windows.append(info)
-                        print("    Window: \(info.displayName)")
                     }
                 }
             } else {
-                print("  No AX windows found, adding app fallback")
                 // Fallback: add app without specific window info
                 let windowInfo = AXWindowInfo(
                     title: "",
@@ -167,12 +153,6 @@ class AXWindowManager {
             title = title.isEmpty ? indicatorText : "\(title) \(indicatorText)"
         }
         
-        print("      Title: '\(titleResult == .success ? (titleRef as? String ?? "nil") : "failed")'")
-        print("      Minimized: \(minimizedResult == .success ? (minimizedRef as? Bool ?? false) : false)")
-        print("      Visible: \(visibleResult == .success ? (visibleRef as? Bool ?? false) : false)")
-        if positionResult == .success, let pos = positionRef as? CGPoint {
-            print("      Position: (\(pos.x), \(pos.y))")
-        }
         
         return AXWindowInfo(
             title: title,

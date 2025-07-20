@@ -27,7 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func createPopover() {
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 450, height: 500)
+        popover.contentSize = NSSize(width: 450, height: 600)
         popover.behavior = .transient
         
         windowListController = AXWindowListViewController()

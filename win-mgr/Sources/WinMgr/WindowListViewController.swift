@@ -12,7 +12,7 @@ class WindowListViewController: NSViewController {
     
     override func loadView() {
         view = NSView()
-        view.frame = NSRect(x: 0, y: 0, width: 400, height: 500)
+        view.frame = NSRect(x: 0, y: 0, width: 450, height: 600)
         setupUI()
     }
     
@@ -40,10 +40,13 @@ class WindowListViewController: NSViewController {
         tableView.rowSizeStyle = .medium
         tableView.target = self
         tableView.doubleAction = #selector(tableViewDoubleClick)
+        tableView.usesAlternatingRowBackgroundColors = true
+        tableView.gridStyleMask = []
         
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("WindowColumn"))
         column.title = "Windows"
-        column.width = 380
+        column.width = 430
+        column.resizingMask = .autoresizingMask
         tableView.addTableColumn(column)
         
         tableView.dataSource = self
@@ -185,19 +188,29 @@ extension WindowListViewController: NSTableViewDelegate {
             textField.isBordered = false
             textField.backgroundColor = .clear
             textField.translatesAutoresizingMaskIntoConstraints = false
+            textField.lineBreakMode = .byTruncatingTail
+            textField.cell?.truncatesLastVisibleLine = true
+            textField.maximumNumberOfLines = 1
+            textField.font = NSFont.systemFont(ofSize: 13)
             cellView.addSubview(textField)
             cellView.textField = textField
             
             NSLayoutConstraint.activate([
-                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 5),
-                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -5),
-                textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor)
+                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 8),
+                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -8),
+                textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
+                textField.heightAnchor.constraint(equalToConstant: 20)
             ])
         }
         
         let window = filteredWindows[row]
         cellView.textField?.stringValue = window.displayName
+        cellView.toolTip = window.displayName  // Show full text on hover
         
         return cellView
+    }
+    
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        return 28
     }
 }
