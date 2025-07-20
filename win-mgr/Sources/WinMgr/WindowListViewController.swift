@@ -8,7 +8,7 @@ class WindowListViewController: NSViewController {
     private var scrollView: NSScrollView!
     
     private var allWindows: [WindowInfo] = []
-    private var filteredWindows: [WindowInfo] = []
+    private var appGroups: [AppGroup] = []
     
     override func loadView() {
         view = NSView()
@@ -42,6 +42,7 @@ class WindowListViewController: NSViewController {
         tableView.doubleAction = #selector(tableViewDoubleClick)
         tableView.usesAlternatingRowBackgroundColors = true
         tableView.gridStyleMask = []
+        tableView.intercellSpacing = NSSize(width: 0, height: 0)
         
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("WindowColumn"))
         column.title = "Windows"
@@ -60,20 +61,34 @@ class WindowListViewController: NSViewController {
             searchField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
             
             scrollView.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 10),
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -10)
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 0),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 0),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 0)
         ])
     }
     
     func refreshWindowList() {
         allWindows = getOpenWindows()
-        filteredWindows = allWindows
+        updateAppGroups()
         
         if isViewLoaded {
             tableView.reloadData()
             searchField.stringValue = ""
         }
+    }
+    
+    private func updateAppGroups() {
+        let searchText = searchField?.stringValue.lowercased() ?? ""
+        
+        let filteredWindows = searchText.isEmpty ? allWindows : allWindows.filter { window in
+            window.displayName.lowercased().contains(searchText)
+        }
+        
+        let groupedByApp = Dictionary(grouping: filteredWindows) { $0.appName }
+        
+        appGroups = groupedByApp.map { appName, windows in
+            AppGroup(appName: appName, windows: windows.sorted { $0.title < $1.title })
+        }.sorted { $0.appName.localizedCaseInsensitiveCompare($1.appName) == .orderedAscending }
     }
     
     private func getOpenWindows() -> [WindowInfo] {
@@ -134,25 +149,50 @@ class WindowListViewController: NSViewController {
     }
     
     @objc private func searchFieldChanged() {
-        let searchText = searchField.stringValue.lowercased()
-        
-        if searchText.isEmpty {
-            filteredWindows = allWindows
-        } else {
-            filteredWindows = allWindows.filter { window in
-                window.displayName.lowercased().contains(searchText)
-            }
-        }
-        
+        updateAppGroups()
         tableView.reloadData()
     }
     
     @objc private func tableViewDoubleClick() {
         let selectedRow = tableView.selectedRow
-        guard selectedRow >= 0 && selectedRow < filteredWindows.count else { return }
+        guard selectedRow >= 0 else { return }
         
-        let window = filteredWindows[selectedRow]
-        focusWindow(window)
+        let (groupIndex, windowIndex) = indexPathForRow(selectedRow)
+        guard groupIndex < appGroups.count else { return }
+        
+        let group = appGroups[groupIndex]
+        if windowIndex == -1 {
+            // Header row - focus the app
+            if let window = group.windows.first {
+                focusWindow(window)
+            }
+        } else if windowIndex < group.windows.count {
+            // Window row
+            let window = group.windows[windowIndex]
+            focusWindow(window)
+        }
+    }
+    
+    private func indexPathForRow(_ row: Int) -> (groupIndex: Int, windowIndex: Int) {
+        var currentRow = 0
+        
+        for (groupIndex, group) in appGroups.enumerated() {
+            // Header row
+            if currentRow == row {
+                return (groupIndex, -1)
+            }
+            currentRow += 1
+            
+            // Window rows
+            for windowIndex in 0..<group.windows.count {
+                if currentRow == row {
+                    return (groupIndex, windowIndex)
+                }
+                currentRow += 1
+            }
+        }
+        
+        return (-1, -1)
     }
     
     private func focusWindow(_ windowInfo: WindowInfo) {
@@ -167,47 +207,97 @@ class WindowListViewController: NSViewController {
 
 extension WindowListViewController: NSTableViewDataSource {
     func numberOfRows(in tableView: NSTableView) -> Int {
-        return filteredWindows.count
+        return appGroups.reduce(0) { total, group in
+            total + 1 + group.windows.count  // 1 for header + windows
+        }
     }
 }
 
 extension WindowListViewController: NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let identifier = NSUserInterfaceItemIdentifier("WindowCellView")
+        let (groupIndex, windowIndex) = indexPathForRow(row)
+        guard groupIndex < appGroups.count else { return nil }
         
-        let cellView: NSTableCellView
-        if let reusedView = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView {
-            cellView = reusedView
+        let group = appGroups[groupIndex]
+        
+        if windowIndex == -1 {
+            // Header row
+            let identifier = NSUserInterfaceItemIdentifier("HeaderCellView")
+            
+            let cellView: NSTableCellView
+            if let reusedView = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView {
+                cellView = reusedView
+            } else {
+                cellView = NSTableCellView()
+                cellView.identifier = identifier
+                
+                let textField = NSTextField()
+                textField.isEditable = false
+                textField.isSelectable = false
+                textField.isBordered = false
+                textField.backgroundColor = .clear
+                textField.translatesAutoresizingMaskIntoConstraints = false
+                textField.lineBreakMode = .byTruncatingTail
+                textField.cell?.truncatesLastVisibleLine = true
+                textField.maximumNumberOfLines = 1
+                textField.font = NSFont.boldSystemFont(ofSize: 13)
+                textField.textColor = .labelColor
+                cellView.addSubview(textField)
+                cellView.textField = textField
+                
+                NSLayoutConstraint.activate([
+                    textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 0),
+                    textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -8),
+                    textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
+                    textField.heightAnchor.constraint(equalToConstant: 20)
+                ])
+            }
+            
+            let displayText = group.appName + group.displayCount
+            cellView.textField?.stringValue = displayText
+            cellView.toolTip = displayText
+            
+            return cellView
         } else {
-            cellView = NSTableCellView()
-            cellView.identifier = identifier
+            // Window row
+            let identifier = NSUserInterfaceItemIdentifier("WindowCellView")
             
-            let textField = NSTextField()
-            textField.isEditable = false
-            textField.isSelectable = false
-            textField.isBordered = false
-            textField.backgroundColor = .clear
-            textField.translatesAutoresizingMaskIntoConstraints = false
-            textField.lineBreakMode = .byTruncatingTail
-            textField.cell?.truncatesLastVisibleLine = true
-            textField.maximumNumberOfLines = 1
-            textField.font = NSFont.systemFont(ofSize: 13)
-            cellView.addSubview(textField)
-            cellView.textField = textField
+            let cellView: NSTableCellView
+            if let reusedView = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView {
+                cellView = reusedView
+            } else {
+                cellView = NSTableCellView()
+                cellView.identifier = identifier
+                
+                let textField = NSTextField()
+                textField.isEditable = false
+                textField.isSelectable = false
+                textField.isBordered = false
+                textField.backgroundColor = .clear
+                textField.translatesAutoresizingMaskIntoConstraints = false
+                textField.lineBreakMode = .byTruncatingTail
+                textField.cell?.truncatesLastVisibleLine = true
+                textField.maximumNumberOfLines = 1
+                textField.font = NSFont.systemFont(ofSize: 13)
+                textField.textColor = .secondaryLabelColor
+                cellView.addSubview(textField)
+                cellView.textField = textField
+                
+                NSLayoutConstraint.activate([
+                    textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 16),
+                    textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -8),
+                    textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
+                    textField.heightAnchor.constraint(equalToConstant: 20)
+                ])
+            }
             
-            NSLayoutConstraint.activate([
-                textField.leadingAnchor.constraint(equalTo: cellView.leadingAnchor, constant: 8),
-                textField.trailingAnchor.constraint(equalTo: cellView.trailingAnchor, constant: -8),
-                textField.centerYAnchor.constraint(equalTo: cellView.centerYAnchor),
-                textField.heightAnchor.constraint(equalToConstant: 20)
-            ])
+            let window = group.windows[windowIndex]
+            let displayText = window.title.isEmpty ? "(No title)" : window.title
+            cellView.textField?.stringValue = displayText
+            cellView.toolTip = window.displayName
+            
+            return cellView
         }
-        
-        let window = filteredWindows[row]
-        cellView.textField?.stringValue = window.displayName
-        cellView.toolTip = window.displayName  // Show full text on hover
-        
-        return cellView
     }
     
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
