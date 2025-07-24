@@ -103,7 +103,6 @@ class AXWindowListViewController: NSViewController {
         
         if isViewLoaded {
             tableView.reloadData()
-            searchField.stringValue = ""
         }
     }
     

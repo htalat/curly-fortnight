@@ -73,7 +73,6 @@ class WindowListViewController: NSViewController {
         
         if isViewLoaded {
             tableView.reloadData()
-            searchField.stringValue = ""
         }
     }
     
