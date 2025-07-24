@@ -6,6 +6,7 @@ class WindowListViewController: NSViewController {
     private var searchField: NSSearchField!
     private var tableView: NSTableView!
     private var scrollView: NSScrollView!
+    private var quitButton: NSButton!
     
     private var allWindows: [WindowInfo] = []
     private var appGroups: [AppGroup] = []
@@ -55,6 +56,12 @@ class WindowListViewController: NSViewController {
         
         scrollView.documentView = tableView
         
+        quitButton = NSButton(title: "Quit", target: self, action: #selector(quitApplication))
+        quitButton.translatesAutoresizingMaskIntoConstraints = false
+        quitButton.bezelStyle = .rounded
+        quitButton.controlSize = .small
+        view.addSubview(quitButton)
+        
         NSLayoutConstraint.activate([
             searchField.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
             searchField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
@@ -63,7 +70,11 @@ class WindowListViewController: NSViewController {
             scrollView.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 10),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 0),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 0),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 0)
+            scrollView.bottomAnchor.constraint(equalTo: quitButton.topAnchor, constant: -10),
+            
+            quitButton.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -10),
+            quitButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            quitButton.widthAnchor.constraint(equalToConstant: 60)
         ])
     }
     
@@ -150,6 +161,10 @@ class WindowListViewController: NSViewController {
     @objc private func searchFieldChanged() {
         updateAppGroups()
         tableView.reloadData()
+    }
+    
+    @objc private func quitApplication() {
+        NSApplication.shared.terminate(nil)
     }
     
     @objc private func tableViewDoubleClick() {
